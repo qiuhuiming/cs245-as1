@@ -1,10 +1,12 @@
 package memstore.table;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
+import memstore.data.ByteFormat;
 import memstore.data.DataLoader;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.TreeMap;
 
 /**
@@ -35,7 +37,24 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public void load(DataLoader loader) throws IOException {
-        // TODO: Implement this!
+        this.numCols = loader.getNumCols();
+        List<ByteBuffer> rows = loader.getRows();
+        numRows = rows.size();
+        this.index = new TreeMap<>();
+        this.rows = ByteBuffer.allocate(ByteFormat.FIELD_LEN * numRows * numCols);
+
+        for (int rowId = 0; rowId < numRows; rowId++) {
+            ByteBuffer curRow = rows.get(rowId);
+            for (int colId = 0; colId < numCols; colId++) {
+                int offset = ByteFormat.FIELD_LEN * ((rowId * numCols) + colId);
+                this.rows.putInt(offset, curRow.getInt(ByteFormat.FIELD_LEN * colId));
+
+                // update index tree
+                int key = getIntField(rowId, indexColumn);
+                IntArrayList value = this.index.getOrDefault(key, new IntArrayList());
+                value.add(rowId);
+            }
+        }
     }
 
     /**
@@ -43,8 +62,7 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public int getIntField(int rowId, int colId) {
-        // TODO: Implement this!
-        return 0;
+        return rows.getInt(ByteFormat.FIELD_LEN * (rowId * numCols + colId));
     }
 
     /**
@@ -52,7 +70,8 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public void putIntField(int rowId, int colId, int field) {
-        // TODO: Implement this!
+        int offset = ByteFormat.FIELD_LEN * ((rowId * numCols) + colId);
+        this.rows.putInt(offset, field);
     }
 
     /**

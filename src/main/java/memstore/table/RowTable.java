@@ -17,6 +17,8 @@ public class RowTable implements Table {
     protected int numRows;
     protected ByteBuffer rows;
 
+    public static int B = 4;
+
     public RowTable() { }
 
     /**
@@ -46,8 +48,7 @@ public class RowTable implements Table {
      */
     @Override
     public int getIntField(int rowId, int colId) {
-        // TODO: Implement this!
-        return 0;
+        return rows.asIntBuffer().get(rowId * numCols + colId);
     }
 
     /**
@@ -55,7 +56,7 @@ public class RowTable implements Table {
      */
     @Override
     public void putIntField(int rowId, int colId, int field) {
-        // TODO: Implement this!
+        rows.asIntBuffer().put(rowId * numCols + colId, field);
     }
 
     /**
