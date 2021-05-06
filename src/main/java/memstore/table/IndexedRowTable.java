@@ -7,6 +7,7 @@ import memstore.data.DataLoader;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 
 /**
@@ -48,12 +49,12 @@ public class IndexedRowTable implements Table {
             for (int colId = 0; colId < numCols; colId++) {
                 int offset = ByteFormat.FIELD_LEN * ((rowId * numCols) + colId);
                 this.rows.putInt(offset, curRow.getInt(ByteFormat.FIELD_LEN * colId));
-
-                // update index tree
-                int key = getIntField(rowId, indexColumn);
-                IntArrayList value = this.index.getOrDefault(key, new IntArrayList());
-                value.add(rowId);
             }
+            // update index tree
+            int key = getIntField(rowId, indexColumn);
+            IntArrayList value = this.index.getOrDefault(key, new IntArrayList());
+            index.put(key, value);
+            value.add(rowId);
         }
     }
 
@@ -82,8 +83,11 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public long columnSum() {
-        // TODO: Implement this!
-        return 0;
+        long result = 0;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+            result += getIntField(rowId, 0);
+        }
+        return result;
     }
 
     /**
@@ -95,8 +99,45 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public long predicatedColumnSum(int threshold1, int threshold2) {
-        // TODO: Implement this!
-        return 0;
+        long result = 0;
+        if (indexColumn == 1) {
+            while (true) {
+                Map.Entry<Integer, IntArrayList> higherEntry = index.higherEntry(threshold1);
+                if (higherEntry == null) {
+                    break;
+                }
+                int threshold = threshold2;
+                result += higherEntry
+                        .getValue()
+                        .stream()
+                        .filter(rowId -> getIntField(rowId, 2) < threshold)
+                        .mapToInt(rowId -> getIntField(rowId, 0))
+                        .sum();
+                threshold1 = higherEntry.getKey();
+            }
+        } else if (indexColumn == 2) {
+            while (true) {
+                Map.Entry<Integer, IntArrayList> lowerEntry = index.lowerEntry(threshold2);
+                if (lowerEntry == null) {
+                    break;
+                }
+                int threshold = threshold1;
+                result += lowerEntry
+                        .getValue()
+                        .stream()
+                        .filter(rowId -> getIntField(rowId, 1) > threshold)
+                        .mapToInt(rowId -> getIntField(rowId, 0))
+                        .sum();
+                threshold2 = lowerEntry.getKey();
+            }
+        } else {
+            for (int rowId = 0; rowId < numRows; rowId++) {
+                if (getIntField(rowId, 1) > threshold1 && getIntField(rowId, 2) < threshold2) {
+                    result += getIntField(rowId, 0);
+                }
+            }
+        }
+        return result;
     }
 
     /**
@@ -107,8 +148,37 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public long predicatedAllColumnsSum(int threshold) {
-        // TODO: Implement this!
-        return 0;
+        long result = 0;
+        if (indexColumn == 0) {
+            while (true) {
+                Map.Entry<Integer, IntArrayList> higherEntry = index.higherEntry(threshold);
+                if (higherEntry == null) {
+                    break;
+                }
+                result += higherEntry
+                        .getValue()
+                        .stream()
+                        .mapToInt(rowId -> {
+                            int sum = 0;
+                            for (int colId = 0; colId < numCols; colId++) {
+                                sum += getIntField(rowId, colId);
+                            }
+                            return sum;
+                        })
+                        .sum();
+                threshold = higherEntry.getKey();
+            }
+        } else {
+            for (int rowId = 0; rowId < numRows; rowId++) {
+                if (getIntField(rowId, 0) <= threshold) {
+                    continue;
+                }
+                for (int colId = 0; colId < numCols; colId++) {
+                    result += getIntField(rowId, colId);
+                }
+            }
+        }
+        return result;
     }
 
     /**
@@ -119,7 +189,28 @@ public class IndexedRowTable implements Table {
      */
     @Override
     public int predicatedUpdate(int threshold) {
-        // TODO: Implement this!
-        return 0;
+        int affected = 0;
+        if (0 == indexColumn) {
+            while (true) {
+                Map.Entry<Integer, IntArrayList> lowerEntry = index.lowerEntry(threshold);
+                if (lowerEntry == null) {
+                    break;
+                }
+                affected += lowerEntry.getValue().size();
+                lowerEntry.getValue()
+                        .stream()
+                        .forEach(rowId -> putIntField(rowId, 3, getIntField(rowId, 3) + getIntField(rowId, 2)));
+                threshold = lowerEntry.getKey();
+            }
+        } else {
+            for (int rowId = 0; rowId < numRows; rowId++) {
+                if (getIntField(rowId, 0) >= threshold) {
+                    continue;
+                }
+                affected++;
+                putIntField(rowId, 3, getIntField(rowId, 3) + getIntField(rowId, 2));
+            }
+        }
+        return affected;
     }
 }

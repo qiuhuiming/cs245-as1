@@ -67,8 +67,11 @@ public class RowTable implements Table {
      */
     @Override
     public long columnSum() {
-        // TODO: Implement this!
-        return 0;
+        long result = 0;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+            result += getIntField(rowId, 0);
+        }
+        return result;
     }
 
     /**
@@ -80,8 +83,13 @@ public class RowTable implements Table {
      */
     @Override
     public long predicatedColumnSum(int threshold1, int threshold2) {
-        // TODO: Implement this!
-        return 0;
+        long result = 0;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+            if (getIntField(rowId, 1) > threshold1 && getIntField(rowId, 2) < threshold2) {
+                result += getIntField(rowId, 0);
+            }
+        }
+        return result;
     }
 
     /**
@@ -92,8 +100,16 @@ public class RowTable implements Table {
      */
     @Override
     public long predicatedAllColumnsSum(int threshold) {
-        // TODO: Implement this!
-        return 0;
+        long result = 0;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+            if (getIntField(rowId, 0) <= threshold) {
+                continue;
+            }
+            for (int colId = 0; colId < numCols; colId++) {
+                result += getIntField(rowId, colId);
+            }
+        }
+        return result;
     }
 
     /**
@@ -104,7 +120,14 @@ public class RowTable implements Table {
      */
     @Override
     public int predicatedUpdate(int threshold) {
-        // TODO: Implement this!
-        return 0;
+        int affected = 0;
+        for (int rowId = 0; rowId < numRows; rowId++) {
+            if (getIntField(rowId, 0) >= threshold) {
+                continue;
+            }
+            affected++;
+            putIntField(rowId, 3, getIntField(rowId, 3) + getIntField(rowId, 2));
+        }
+        return affected;
     }
 }
